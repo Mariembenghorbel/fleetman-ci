@@ -1,0 +1,30 @@
+pipeline {
+  agent any
+  environment {
+    IMAGE = "mariem2211/fleetman-webapp"
+  }
+  stages {
+    stage('Build') {
+      steps {
+        dir('webapp') {
+          sh 'docker build -t $IMAGE:$BUILD_NUMBER .'
+        }
+      }
+    }
+    stage('Push') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub',
+            usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+          sh 'echo $DH_PASS | docker login -u $DH_USER --password-stdin'
+          sh 'docker push $IMAGE:$BUILD_NUMBER'
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        sh 'kubectl set image deployment/webapp webapp=$IMAGE:$BUILD_NUMBER'
+        sh 'kubectl rollout status deployment/webapp --timeout=120s'
+      }
+    }
+  }
+}
