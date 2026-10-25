@@ -1,0 +1,24 @@
+pipeline {
+  agent any
+  environment { IMAGE = "mariem2211/fleetman-queue" }
+  stages {
+    stage('Build') {
+      steps { dir('queue') { sh 'docker build -t $IMAGE:$BUILD_NUMBER .' } }
+    }
+    stage('Push') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub',
+            usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+          sh 'echo $DH_PASS | docker login -u $DH_USER --password-stdin'
+          sh 'docker push $IMAGE:$BUILD_NUMBER'
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        sh 'kubectl set image deployment/queue k8s-fleetman-queue=$IMAGE:$BUILD_NUMBER'
+        sh 'kubectl rollout status deployment/queue --timeout=300s'
+      }
+    }
+  }
+}

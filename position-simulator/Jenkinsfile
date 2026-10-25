@@ -1,0 +1,37 @@
+pipeline {
+  agent any
+  environment { IMAGE = "mariem2211/fleetman-position-simulator" }
+  stages {
+    stage('SonarQube') {
+      steps {
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+          dir('position-simulator') {
+            sh '''docker run --rm -v "$PWD":/app -w /app maven:3.8-openjdk-8 \
+              mvn -B clean verify sonar:sonar -DskipTests \
+              -Dsonar.host.url=http://192.168.231.140:9000 \
+              -Dsonar.login=$SONAR_TOKEN \
+              -Dsonar.projectKey=position-simulator'''
+          }
+        }
+      }
+    }
+    stage('Build') {
+      steps { dir('position-simulator') { sh 'docker build -t $IMAGE:$BUILD_NUMBER .' } }
+    }
+    stage('Push') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub',
+            usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+          sh 'echo $DH_PASS | docker login -u $DH_USER --password-stdin'
+          sh 'docker push $IMAGE:$BUILD_NUMBER'
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        sh 'kubectl set image deployment/position-simulator k8s-fleetman-position-simulator=$IMAGE:$BUILD_NUMBER'
+        sh 'kubectl rollout status deployment/position-simulator --timeout=300s'
+      }
+    }
+  }
+}
