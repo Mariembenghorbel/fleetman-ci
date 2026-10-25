@@ -22,7 +22,7 @@ pipeline {
     }
     stage('Deploy') {
       steps {
-        sh 'kubectl set image deployment/webapp webapp=$IMAGE:$BUILD_NUMBER'
+        sh 'kubectl set image deployment/webapp k8s-fleetman-webapp-angular=$IMAGE:$BUILD_NUMBER'
         sh 'kubectl rollout status deployment/webapp --timeout=120s'
       }
     }
